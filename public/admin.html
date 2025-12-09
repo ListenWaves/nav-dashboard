@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>后台管理 - 导航站</title>
+<link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<!-- 登录界面 -->
+<div class="login" id="loginBox">
+<h2>🔐 管理员登录</h2>
+<input id="password" type="password" placeholder="输入后台密码" />
+<button onclick="login()">登录</button>
+</div>
+
+<!-- 管理面板 -->
+<div id="adminPanel" style="display:none">
+<h1>📊 后台管理面板</h1>
+<button onclick="loadData()">🔄 刷新数据</button>
+<button onclick="window.location.href='index.html'">🏠 返回首页</button>
+<button onclick="showChangePassword()">🔐 修改密码</button>
+
+<h2>🖼️ 前端背景图</h2>
+<div class="form-group">
+<input id="bgUrl" placeholder="图片 URL（外链/自域名图床）" />
+<input id="bgPassword" type="password" placeholder="管理员密码（保存必填）" />
+</div>
+<div style="display:flex; gap:10px; flex-wrap: wrap; align-items:center; margin-bottom:10px;">
+  <button onclick="saveBgUrl()">✅ 保存背景图 URL</button>
+  <label style="cursor:pointer; display:inline-block; padding:12px 20px; background:#667eea; color:#fff; border-radius:10px;">
+    📤 上传图片（KV）
+    <input id="bgFile" type="file" accept="image/*" style="display:none" onchange="uploadBgFile(event)" />
+  </label>
+  <span id="bgStatus" style="font-size:13px; opacity:0.8;"></span>
+</div>
+<div id="bgPreview" style="margin:10px 0; height:160px; border-radius:14px; border:1px solid rgba(200,200,200,0.5); background-size:cover; background-position:center; display:none;"></div>
+
+<h2>🏷️ 站点标题</h2>
+<div class="form-group">
+<input id="siteTitle" placeholder="站点标题（默认：我的导航站）" />
+<input id="titlePassword" type="password" placeholder="管理员密码（保存必填）" />
+</div>
+<button onclick="saveSiteTitle()">💾 保存站点标题</button>
+
+<h2>➕ 添加新站点</h2>
+<div class="form-group">
+<input id="name" placeholder="站点名称（必填）" required />
+<input id="url" placeholder="网址（必填，如：https://baidu.com）" required />
+<input id="desc" placeholder="站点描述" />
+<input id="category" placeholder="分类（如：搜索引擎、社交媒体）" />
+</div>
+<button onclick="addSite()">✅ 添加站点</button>
+
+<h2>📂 分类管理</h2>
+<div class="form-group">
+  <input id="catName" placeholder="分类名（如：搜索引擎）" />
+  <input id="catIcon" placeholder="图标（可选，如：🔍）" />
+</div>
+<button onclick="addCategory()">➕ 添加分类</button>
+<div id="catList" style="margin-top:10px;">
+  <p style="text-align:center; opacity:0.7;">加载中...</p>
+</div>
+
+<h2>📋 站点列表</h2>
+<div id="siteList">
+<p style="text-align:center; opacity:0.7;">加载中...</p>
+</div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div id="passwordModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+<div style="background:rgba(255,255,255,0.98); border-radius:20px; padding:30px; width:90%; max-width:400px; border:1px solid rgba(200,200,200,0.3); box-shadow: 0 8px 32px rgba(0,0,0,0.15);">
+<h2 style="margin-bottom:20px; color:#444;">🔐 修改密码</h2>
+<input id="oldPassword" type="password" placeholder="旧密码" style="margin-bottom:10px;" />
+<input id="newPassword" type="password" placeholder="新密码（至少6位）" style="margin-bottom:10px;" />
+<input id="confirmPassword" type="password" placeholder="确认新密码" style="margin-bottom:20px;" />
+<div style="display:flex; gap:10px;">
+<button onclick="changePassword()" style="flex:1;">✅ 确认修改</button>
+<button onclick="hideChangePassword()" style="flex:1; background:#999;">❌ 取消</button>
+</div>
+</div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
