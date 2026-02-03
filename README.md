@@ -1,41 +1,104 @@
-# 导航站（Cloudflare Workers）
+# 导航站（Cloudflare Workers + D1 + KV）
 
-一个无框架的个人导航站，支持拖拽排序、后台管理、可自定义背景（URL 或 KV），分类可增删。
+一个无框架的个人导航站：前台支持搜索/分类/拖拽，后台可管理站点、分类、背景图和站点标题，数据存储在 Cloudflare D1，静态资源由 Workers Assets 提供，背景图可用 KV 直传或 URL 外链。
 
-## 功能
-- 前台：拖拽卡片、搜索、分类筛选、自定义背景。
-- 后台：登录、站点增删、密码修改、背景设置（URL/上传至 KV）、分类管理（增删、图标自定义）。
+## 功能概览
+- 前台：磨砂玻璃风格、搜索、分类筛选、拖拽排序（仅前端视图）、背景图、站点标题。
+- 后台：登录、站点增删、分类管理、背景图 URL/KV 上传、标题修改、密码修改。
+- 数据：D1 存储 `sites`/`categories`/`config`，自动生成站点 favicon。
 
-## 部署（GitHub Actions，推荐）
-1. 在你的仓库添加 Secrets：
-   - `CF_API_TOKEN`（含 Workers & D1 权限）
-   - `CF_ACCOUNT_ID`
-   - `CF_DATABASE_ID`（D1 ID）
-   - `CF_KV_ID`（KV Namespace ID，用于背景）
-2. Cloudflare 创建 D1、KV，复制 ID 填入上面 Secrets。
-3. 工作流会自动执行 `schema.sql` 初始化表结构（幂等，可多次运行）。
-4. 推送到 `main` 或在 Actions 手动运行，workflow 会动态生成 `wrangler.toml` 并部署。
+## 一键部署（GitHub Actions，推荐）
 
-## 本地开发
+### 1. Fork 本仓库
+点击右上角 `Fork`，把项目复制到你自己的 GitHub 账号下。
+
+### 2. Cloudflare 准备（只做一次）
+1. 创建 D1 数据库：`Workers & Pages` -> `D1` -> `Create database`。  
+   记下 `Database ID`，数据库名建议用 `nav_db`（可自定义）。
+2. 创建 KV 命名空间：`Workers & Pages` -> `KV` -> `Create namespace`。  
+   记下 `Namespace ID`（背景图功能依赖 KV）。
+3. 创建 API Token：`My Profile` -> `API Tokens` -> `Create Token`。  
+   选择 `Edit Cloudflare Workers` 模板，确保有 D1/KV 权限。
+4. 记下你的 `Account ID`：在 Cloudflare 控制台右侧可见。
+
+### 3. 在 GitHub 添加 Secrets
+进入你 fork 的仓库：`Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`，依次添加：
+- `CF_API_TOKEN`：Cloudflare API Token
+- `CF_ACCOUNT_ID`：Cloudflare Account ID
+- `CF_DATABASE_ID`：D1 Database ID
+- `CF_KV_ID`：KV Namespace ID
+
+可选参数（不用也能部署）：
+- `D1_NAME`：D1 数据库名，默认 `nav_db`
+- `WRANGLER_NAME`：Worker 名称，默认 `nav-site`
+- `COMPAT_DATE`：兼容日期，默认 `2024-01-01`
+
+### 4. 触发部署
+二选一：
+- 提交代码到 `main` 分支，自动触发 Actions
+- 在 `Actions` 页面手动运行 `Deploy to Cloudflare`
+
+部署成功后，可在 Cloudflare `Workers & Pages` 中看到访问地址。
+
+### 5. 自动初始化数据库
+Actions 会自动执行 `schema.sql` 初始化表结构（幂等，可重复执行）。
+
+## 管理后台
+- 后台地址：`/admin.html`
+- 默认密码：`admin123`（登录后请立即修改）
+
+## 背景图与标题
+- 背景图 URL：后台输入外链地址即可。
+- 背景图 KV 上传：后台直接上传图片（≤25MB，建议 ≤10MB）。
+- 站点标题：后台可直接修改。
+
+## 本地开发（可选）
+本地开发需要 `wrangler.toml`，可参考以下模板（把 ID 改成自己的）：
+```toml
+name = "nav-site"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+assets = { directory = "./public", binding = "ASSETS" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nav_db"
+database_id = "替换为你的 D1 ID"
+
+[[kv_namespaces]]
+binding = "BG"
+id = "替换为你的 KV ID"
+```
+
+然后执行：
 ```bash
 npm install
 npx wrangler dev
 ```
 
-## 数据库初始化
+## 数据库操作（可选）
+初始化或导入示例数据：
 ```bash
 npx wrangler d1 execute nav_db --file=schema.sql
+npx wrangler d1 execute nav_db --file=sample-data.sql
 ```
 
-## 背景图片说明
-- 上传到 KV 的图片：受 Workers 请求体限制，实际可行上限约 10MB（KV 单条 25MB，但请求体约 10MB），超过请改用 URL 模式或存储在 R2/图床。
-- URL 模式：后台填入图片外链即可。
+## 目录结构
+```
+.
+├── worker.js            # Cloudflare Worker 入口
+├── public/              # 前端静态文件
+│   ├── index.html
+│   ├── admin.html
+│   ├── script.js
+│   └── admin.js
+├── schema.sql           # 数据库结构
+├── sample-data.sql      # 示例数据
+└── .github/workflows/   # 自动部署
+```
 
-## 管理后台
-- 路径：`/admin.html`
-- 默认密码：`admin123`（请登录后立即修改）
-
-## 环境与绑定
+## 绑定说明
 - D1 绑定名：`DB`
 - KV 绑定名：`BG`
 - 静态资源绑定：`ASSETS`
