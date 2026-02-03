@@ -1,9 +1,36 @@
 // 使用相对路径，自动适配你的域名
 const API = "";
+const ADMIN_TOKEN_KEY = "admin_token";
 
 let isLogin = false;
 let categories = [];
 let currentTitle = "我的导航站";
+
+function getToken() {
+  return sessionStorage.getItem(ADMIN_TOKEN_KEY) || "";
+}
+
+function setToken(token) {
+  if (token) {
+    sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+  } else {
+    sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  }
+}
+
+async function authFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    setToken("");
+    isLogin = false;
+    document.getElementById("loginBox").style.display = "block";
+    document.getElementById("adminPanel").style.display = "none";
+  }
+  return res;
+}
 
 // 登录
 async function login() {
@@ -26,6 +53,7 @@ async function login() {
     const data = await res.json();
 
     if (data.ok) {
+      setToken(data.token || "");
       isLogin = true;
       document.getElementById("loginBox").style.display = "none";
       document.getElementById("adminPanel").style.display = "block";
@@ -50,6 +78,15 @@ document.addEventListener("DOMContentLoaded", () => {
         login();
       }
     });
+  }
+
+  if (getToken()) {
+    isLogin = true;
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("adminPanel").style.display = "block";
+    loadConfig();
+    loadCategories();
+    loadData();
   }
 });
 
@@ -83,16 +120,11 @@ async function loadConfig() {
 // 保存背景图 URL
 async function saveBgUrl() {
   const url = document.getElementById("bgUrl").value.trim();
-  const password = document.getElementById("bgPassword").value.trim();
-  if (!password) {
-    alert("请输入管理员密码");
-    return;
-  }
   try {
-    const res = await fetch(`${API}/api/config/bg`, {
+    const res = await authFetch(`${API}/api/config/bg`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, password })
+      body: JSON.stringify({ url })
     });
     const data = await res.json();
     alert(data.message || (data.ok ? "保存成功" : "保存失败"));
@@ -105,12 +137,7 @@ async function saveBgUrl() {
 // 上传背景图到 KV
 async function uploadBgFile(event) {
   const file = event.target.files?.[0];
-  const password = document.getElementById("bgPassword").value.trim();
   if (!file) return;
-  if (!password) {
-    alert("请输入管理员密码");
-    return;
-  }
   if (file.size > 25 * 1024 * 1024) {
     alert("图片过大，请控制在 25MB 以内");
     return;
@@ -119,10 +146,10 @@ async function uploadBgFile(event) {
   reader.onload = async () => {
     const base64 = reader.result.split(",")[1];
     try {
-      const res = await fetch(`${API}/api/config/bg`, {
+      const res = await authFetch(`${API}/api/config/bg`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, contentType: file.type || "image/jpeg", password })
+        body: JSON.stringify({ base64, contentType: file.type || "image/jpeg" })
       });
       const data = await res.json();
       alert(data.message || (data.ok ? "上传成功" : "上传失败"));
@@ -137,20 +164,15 @@ async function uploadBgFile(event) {
 // 保存站点标题
 async function saveSiteTitle() {
   const title = document.getElementById("siteTitle").value.trim();
-  const password = document.getElementById("titlePassword").value.trim();
-  if (!password) {
-    alert("请输入管理员密码");
-    return;
-  }
   if (!title) {
     alert("标题不能为空");
     return;
   }
   try {
-    const res = await fetch(`${API}/api/config/title`, {
+    const res = await authFetch(`${API}/api/config/title`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, password })
+      body: JSON.stringify({ title })
     });
     const data = await res.json();
     alert(data.message || (data.ok ? "保存成功" : "保存失败"));
@@ -165,7 +187,7 @@ async function saveSiteTitle() {
 // 加载分类列表
 async function loadCategories() {
   try {
-    const res = await fetch(`${API}/api/categories`);
+    const res = await authFetch(`${API}/api/categories`);
     categories = await res.json();
     renderCategoryList();
   } catch (e) {
@@ -177,16 +199,25 @@ function renderCategoryList() {
   const box = document.getElementById("catList");
   box.innerHTML = "";
   if (!categories.length) {
-    box.innerHTML = "<p style='text-align:center; opacity:0.7;'>暂无分类</p>";
+    const empty = document.createElement("p");
+    empty.style.textAlign = "center";
+    empty.style.opacity = "0.7";
+    empty.textContent = "暂无分类";
+    box.appendChild(empty);
     return;
   }
   categories.forEach(cat => {
     const row = document.createElement("div");
     row.className = "item";
-    row.innerHTML = `
-      <p><strong>${cat.icon || "📁"} ${cat.name}</strong></p>
-      <button onclick="deleteCategory(${cat.id})">删除</button>
-    `;
+    const p = document.createElement("p");
+    const strong = document.createElement("strong");
+    strong.textContent = `${cat.icon || "📁"} ${cat.name}`;
+    p.appendChild(strong);
+    const btn = document.createElement("button");
+    btn.textContent = "删除";
+    btn.addEventListener("click", () => deleteCategory(cat.id));
+    row.appendChild(p);
+    row.appendChild(btn);
     box.appendChild(row);
   });
 }
@@ -200,7 +231,7 @@ async function addCategory() {
     return;
   }
   try {
-    const res = await fetch(`${API}/api/categories/add`, {
+    const res = await authFetch(`${API}/api/categories/add`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, icon })
@@ -222,7 +253,7 @@ async function addCategory() {
 async function deleteCategory(id) {
   if (!confirm("确认删除这个分类吗？")) return;
   try {
-    const res = await fetch(`${API}/api/categories/delete`, {
+    const res = await authFetch(`${API}/api/categories/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id })
@@ -241,29 +272,50 @@ async function deleteCategory(id) {
 // 加载数据
 async function loadData() {
   try {
-    const res = await fetch(`${API}/api/sites`);
+    const res = await authFetch(`${API}/api/sites`);
     const list = await res.json();
 
     const box = document.getElementById("siteList");
     box.innerHTML = "";
 
     if (list.length === 0) {
-      box.innerHTML = "<p style='text-align:center; opacity:0.7;'>暂无站点，快去添加第一个吧！</p>";
+      const empty = document.createElement("p");
+      empty.style.textAlign = "center";
+      empty.style.opacity = "0.7";
+      empty.textContent = "暂无站点，快去添加第一个吧！";
+      box.appendChild(empty);
       return;
     }
 
     list.forEach(item => {
       const div = document.createElement("div");
       div.className = "item";
-      div.innerHTML = `
-        <p>
-          <strong>${item.name}</strong><br>
-          <small style="opacity:0.8">${item.url}</small><br>
-          ${item.desc ? `<small>📝 ${item.desc}</small><br>` : ''}
-          ${item.category ? `<small>📂 ${item.category}</small>` : ''}
-        </p>
-        <button onclick="deleteSite(${item.id})">🗑️ 删除</button>
-      `;
+      const p = document.createElement("p");
+      const strong = document.createElement("strong");
+      strong.textContent = item.name;
+      p.appendChild(strong);
+      p.appendChild(document.createElement("br"));
+      const urlSmall = document.createElement("small");
+      urlSmall.style.opacity = "0.8";
+      urlSmall.textContent = item.url;
+      p.appendChild(urlSmall);
+      p.appendChild(document.createElement("br"));
+      if (item.desc) {
+        const descSmall = document.createElement("small");
+        descSmall.textContent = `📝 ${item.desc}`;
+        p.appendChild(descSmall);
+        p.appendChild(document.createElement("br"));
+      }
+      if (item.category) {
+        const catSmall = document.createElement("small");
+        catSmall.textContent = `📂 ${item.category}`;
+        p.appendChild(catSmall);
+      }
+      const btn = document.createElement("button");
+      btn.textContent = "🗑️ 删除";
+      btn.addEventListener("click", () => deleteSite(item.id));
+      div.appendChild(p);
+      div.appendChild(btn);
       box.appendChild(div);
     });
   } catch (error) {
@@ -294,7 +346,7 @@ async function addSite() {
   const data = { name, url, desc, category };
 
   try {
-    await fetch(`${API}/api/add`, {
+    await authFetch(`${API}/api/add`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -322,7 +374,7 @@ async function deleteSite(id) {
   if (!confirm("⚠️ 确认删除这个站点吗？")) return;
 
   try {
-    await fetch(`${API}/api/delete`, {
+    await authFetch(`${API}/api/delete`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -375,7 +427,7 @@ async function changePassword() {
   }
 
   try {
-    const res = await fetch(`${API}/api/change-password`, {
+    const res = await authFetch(`${API}/api/change-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -389,6 +441,7 @@ async function changePassword() {
     const data = await res.json();
 
     if (data.ok) {
+      if (data.token) setToken(data.token);
       alert("✅ " + (data.message || "密码修改成功！请牢记新密码"));
       hideChangePassword();
       // 5秒后跳转到登录页

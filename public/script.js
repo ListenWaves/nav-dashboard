@@ -6,6 +6,18 @@ let currentFilter = null;
 let categoriesFromServer = [];
 let siteTitle = "我的导航站";
 
+function getSafeHttpUrl(value) {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.toString();
+    }
+  } catch (e) {
+    return "";
+  }
+  return "";
+}
+
 // 初始化
 document.addEventListener("DOMContentLoaded", async () => {
   await loadConfig();
@@ -75,20 +87,40 @@ function renderSites(sites) {
     card.className = "card";
     card.draggable = true;
     card.dataset.index = index;
-    
-    card.innerHTML = `
-      <h3>
-        ${site.logo ? `<img src="${site.logo}" class="logo" alt="${site.name}" onerror="this.style.display='none'">` : ''}
-        ${site.name}
-      </h3>
-      <p>${site.desc || "暂无描述"}</p>
-      ${site.category ? `<span class="category-tag">${site.category}</span>` : ''}
-    `;
+
+    const title = document.createElement("h3");
+    if (site.logo) {
+      const logoUrl = getSafeHttpUrl(site.logo);
+      if (logoUrl) {
+        const img = document.createElement("img");
+        img.src = logoUrl;
+        img.className = "logo";
+        img.alt = site.name || "";
+        img.onerror = () => { img.style.display = "none"; };
+        title.appendChild(img);
+      }
+    }
+    const nameNode = document.createTextNode(site.name || "");
+    title.appendChild(nameNode);
+
+    const desc = document.createElement("p");
+    desc.textContent = site.desc || "暂无描述";
+
+    card.appendChild(title);
+    card.appendChild(desc);
+
+    if (site.category) {
+      const tag = document.createElement("span");
+      tag.className = "category-tag";
+      tag.textContent = site.category;
+      card.appendChild(tag);
+    }
     
     // 点击打开链接
     card.addEventListener('click', (e) => {
       if (!card.classList.contains('dragging')) {
-        window.open(site.url, "_blank");
+        const safeUrl = getSafeHttpUrl(site.url);
+        if (safeUrl) window.open(safeUrl, "_blank", "noopener");
       }
     });
     
