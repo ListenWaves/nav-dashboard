@@ -34,11 +34,21 @@
 - `COMPAT_DATE`：兼容日期，默认 `2024-01-01`
 
 ### 4. 触发部署
-二选一：
-- 提交代码到 `main` 分支，自动触发 Actions
-- 在 `Actions` 页面手动运行 `Deploy to Cloudflare`
+二选一，任选其一即可：
+- 推送代码触发：在仓库根目录执行  
+  ```bash
+  git add .
+  git commit -m "deploy"
+  git push origin main
+  ```
+  推送后会自动触发 `Deploy to Cloudflare` 工作流。
+- 手动触发：打开仓库 `Actions` -> 左侧选择 `Deploy to Cloudflare` -> 右侧点 `Run workflow`。
 
-部署成功后，可在 Cloudflare `Workers & Pages` 中看到访问地址。
+### 5. 查看部署结果与访问地址
+1. 在 GitHub `Actions` 中看到绿色 ✅ 表示部署完成。
+2. 去 Cloudflare 控制台：`Workers & Pages` -> `Overview`，找到你的 Worker（默认名 `nav-site`）。
+3. 点进 Worker，在右侧可以看到默认访问域名，格式通常为：  
+   `https://<你的worker名>.<你的子域>.workers.dev`
 
 ### 5. 自动初始化数据库
 Actions 会自动执行 `schema.sql` 初始化表结构（幂等，可重复执行）。
